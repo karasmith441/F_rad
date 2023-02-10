@@ -9,6 +9,12 @@ DataGrid::DataGrid(Disk disk, WindParams wind, int coordID, Array1d POS_1, Array
 
   this->coordID = coordID;
 
+  param_nu = 0;
+  param_p = 0;
+  param_a = 0;
+  param_b = 0;
+  verbose = false;
+
   // set parameters
   if(coordID == SPHERICAL)
   {
@@ -50,8 +56,7 @@ DataGrid::DataGrid(Disk disk, WindParams wind, int coordID, Array1d POS_1, Array
 // Sampling functions
 // =============================================================================
 
-
-Array1d DataGrid::Sample(int SampID, int funcID, ldouble nu, ldouble p, ldouble a, ldouble b)
+Array1d DataGrid::Sample(int SampID, int funcID)
 {
   Array1d col;
   if(coordID == SPHERICAL)
@@ -62,25 +67,28 @@ Array1d DataGrid::Sample(int SampID, int funcID, ldouble nu, ldouble p, ldouble 
       for(int j = 0; j < Theta.size(); ++j)
       {
         disk.setPolarObserver(R[i], Theta[j]);
+        if(verbose)
+          std::cout << R[i] / disk.R_in << " " << Theta[j] * 180/PI << std::endl;
+
         switch(SampID)
         {
         case OMEGA:
-          col.push_back(disk.dOmega_integral(funcID, nu));
+          col.push_back(disk.dOmega_integral(funcID, param_nu));
           break;
         case NU:
           col.push_back(disk.dnu_integral(funcID));
           break;
         case POWER:
-          col.push_back(disk.power_integral(funcID, p));
+          col.push_back(disk.power_integral(funcID, param_p));
           break;
         case BAND:
-          if(b == 0)
+          if(param_b == 0)
           {
-            col.push_back(disk.band_integral(funcID, a));
+            col.push_back(disk.band_integral(funcID, param_a));
           }
           else
           {
-            col.push_back(disk.band_integral(funcID, a, b));
+            col.push_back(disk.band_integral(funcID, param_a, param_b));
           }
           break;
         case MEAN_PHOTON_ENERGY:
@@ -95,31 +103,34 @@ Array1d DataGrid::Sample(int SampID, int funcID, ldouble nu, ldouble p, ldouble 
   }
   if(coordID == CARTESIAN)
   {
-    //loop over all (r, theta) observer points
+
     for(int i = 0; i < X.size(); ++i)
     {
       for(int j = 0; j < Z.size(); ++j)
       {
         disk.setCartesianObserver(X[i], Z[j]);
+        if(verbose)
+          std::cout << X[i] / disk.R_in << " " << Z[j] * disk.R_in << std::endl;
+
         switch(SampID)
         {
         case OMEGA:
-          col.push_back(disk.dOmega_integral(funcID, nu));
+          col.push_back(disk.dOmega_integral(funcID, param_nu));
           break;
         case NU:
           col.push_back(disk.dnu_integral(funcID));
           break;
         case POWER:
-          col.push_back(disk.power_integral(funcID, p));
+          col.push_back(disk.power_integral(funcID, param_p));
           break;
         case BAND:
-          if(b == 0)
+          if(param_b == 0)
           {
-            col.push_back(disk.band_integral(funcID, a));
+            col.push_back(disk.band_integral(funcID, param_a));
           }
           else
           {
-            col.push_back(disk.band_integral(funcID, a, b));
+            col.push_back(disk.band_integral(funcID, param_a, param_b));
           }
           break;
         case MEAN_PHOTON_ENERGY:
@@ -133,6 +144,8 @@ Array1d DataGrid::Sample(int SampID, int funcID, ldouble nu, ldouble p, ldouble 
     }
   }
 
+  clearparams();
+
   return col;
 }
 
@@ -143,7 +156,7 @@ Array1d DataGrid::Sample(int SampID, int funcID, ldouble nu, ldouble p, ldouble 
 - Pushes the values for the spectral energy distribution for all r and theta.
 - Will create a column for each frequency in the nu array passed in.
 */
-void DataGrid::addSpectra(int funcID, Array1d nu)
+void DataGrid::addSpectraAndExport(std::string ExportPath, int funcID, Array1d nu)
 {
   int ResSize = Res.size();
   for(int i = 0; i < nu.size(); ++i)
@@ -163,6 +176,9 @@ void DataGrid::addSpectra(int funcID, Array1d nu)
       for(int j = 0; j < Theta.size(); ++j)
       {
         disk.setPolarObserver(R[i], Theta[j]);
+        if(verbose)
+          std::cout << R[i] / disk.R_in << " " << Theta[j] * 180/PI << std::endl;
+
         row = disk.dOmega_integral(funcID, nu);
         for(int k = ResSize; k < ResSize + nu.size(); ++k)
         {
@@ -173,12 +189,14 @@ void DataGrid::addSpectra(int funcID, Array1d nu)
   }
   else if(coordID == CARTESIAN)
   {
-    //loop over all (r, theta) observer points
     for(int i = 0; i < X.size(); ++i)
     {
       for(int j = 0; j < Z.size(); ++j)
       {
         disk.setPolarObserver(X[i], Z[j]);
+        if(verbose)
+          std::cout << X[i] / disk.R_in << " " << Z[j] * disk.R_in << std::endl;
+
         row = disk.dOmega_integral(funcID, nu);
         for(int k = ResSize; k < ResSize + nu.size(); ++k)
         {
@@ -187,6 +205,8 @@ void DataGrid::addSpectra(int funcID, Array1d nu)
       }
     }
   }
+
+  Export(ExportPath);
 }
 
 /*
@@ -196,10 +216,13 @@ void DataGrid::addSpectra(int funcID, Array1d nu)
 - Pushes the values for the geometric integral given nu for all r and theta
 - into a results column
 */
-void DataGrid::addOmegaIntegral(int funcID, ldouble nu)
+void DataGrid::addOmegaIntegral(std::string name, int funcID, ldouble nu)
 {
-    Head.push_back("geometric integral");
-    Res.push_back(Sample(OMEGA, funcID, nu, 0, 0, 0));
+    if(verbose)
+      std::cout << name << std::endl;
+    param_nu = nu;
+    Res.push_back(Sample(OMEGA, funcID));
+    Head.push_back(name);
 }
 
 /*
@@ -208,10 +231,12 @@ void DataGrid::addOmegaIntegral(int funcID, ldouble nu)
 - Pushes the values for the frequency integral for all r and theta
 - into a results column
 */
-void DataGrid::addFrequencyIntegral(int funcID)
+void DataGrid::addFrequencyIntegral(std::string name, int funcID)
 {
-  Head.push_back("frequency integral");
-  Res.push_back(Sample(NU, funcID, 0, 0, 0, 0));
+  if(verbose)
+    std::cout << name << std::endl;
+  Res.push_back(Sample(NU, funcID));
+  Head.push_back(name);
 }
 
 /*
@@ -221,10 +246,13 @@ void DataGrid::addFrequencyIntegral(int funcID)
 - Pushes the values for the (nu^p)*f(nu) integral for all r and theta
 - into a results column
 */
-void DataGrid::addPowerIntegral(int funcID, ldouble p)
+void DataGrid::addPowerIntegral(std::string name, int funcID, ldouble p)
 {
-  Head.push_back("power integral");
-  Res.push_back(Sample(POWER, funcID, 0, p, 0, 0));
+  if(verbose)
+    std::cout << name << std::endl;
+  param_p = p;
+  Res.push_back(Sample(POWER, funcID));
+  Head.push_back(name);
 }
 
 /*
@@ -234,10 +262,13 @@ void DataGrid::addPowerIntegral(int funcID, ldouble p)
 - Pushes the values for the frequency band integral for all r and theta
 - into a results column
 */
-void DataGrid::addBandIntegral(int funcID, ldouble a)
+void DataGrid::addBandIntegral(std::string name, int funcID, ldouble a)
 {
-  Head.push_back("band integral");
-  Res.push_back(Sample(BAND, funcID, 0, 0, a, 0));
+  if(verbose)
+    std::cout << name << std::endl;
+  param_a = a;
+  Res.push_back(Sample(BAND, funcID));
+  Head.push_back(name);
 }
 
 /*
@@ -248,10 +279,14 @@ void DataGrid::addBandIntegral(int funcID, ldouble a)
 - Pushes the values for the frequency band integral for all r and theta
 - into a results column
 */
-void DataGrid::addBandIntegral(int funcID, ldouble a, ldouble b)
+void DataGrid::addBandIntegral(std::string name, int funcID, ldouble a, ldouble b)
 {
-  Head.push_back("band integral");
-  Res.push_back(Sample(BAND, funcID, 0, 0, a, b));
+  if(verbose)
+    std::cout << name << std::endl;
+  param_a = a;
+  param_b = b;
+  Res.push_back(Sample(BAND, funcID));
+  Head.push_back(name);
 }
 
 /*
@@ -260,10 +295,12 @@ void DataGrid::addBandIntegral(int funcID, ldouble a, ldouble b)
 - Pushes the values for the mean photon energy for all r and theta
 - into a results column
 */
-void DataGrid::addMeanPhotonEnergy(int funcID)
+void DataGrid::addMeanPhotonEnergy(std::string name, int funcID)
 {
-  Head.push_back("mean photon energy");
-  Res.push_back(Sample(MEAN_PHOTON_ENERGY, funcID, 0, 0, 0, 0));
+  if(verbose)
+    std::cout << name << std::endl;
+  Res.push_back(Sample(MEAN_PHOTON_ENERGY, funcID));
+  Head.push_back(name);
 }
 
 /*
@@ -272,10 +309,12 @@ void DataGrid::addMeanPhotonEnergy(int funcID)
 - Pushes the values for the radiation force for all r and theta
 - into a results column
 */
-void DataGrid::addRadiationForce(int funcID)
+void DataGrid::addRadiationForce(std::string name, int funcID)
 {
-  Head.push_back("radiation force");
-  Res.push_back(Sample(F_RAD, funcID, 0, 0, 0, 0));
+  if(verbose)
+    std::cout << name << std::endl;
+  Res.push_back(Sample(F_RAD, funcID));
+  Head.push_back(name);
 }
 
 // =============================================================================
@@ -355,7 +394,13 @@ void DataGrid::clear()
   Res.push_back(col2);
 }
 
-
+void DataGrid::clearparams()
+{
+  param_nu = 0;
+  param_p = 0;
+  param_a = 0;
+  param_b = 0;
+}
 
 
 

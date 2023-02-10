@@ -19,7 +19,7 @@ Disk::Disk(ldouble M, ldouble Gamma, ldouble epsilon, ldouble R_star, ldouble R_
 
     // initialize the integrator
     quad = Integrator();
-    nu_pts = 100;
+    nu_pts = 50;
     mu_pts = 12;
     phi_pts = 12;
     band_pts = 50;

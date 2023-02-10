@@ -58,31 +58,44 @@ public:
   int coordID;                    // determines if we are in polar or cartesian coords
   Array1d R, Theta, X, Z;         // Lists of positions
 
+  ldouble param_nu, param_p, param_a, param_b;
+  bool verbose;
+
   std::vector<std::string> Head;  // List of column names
   Array2d Res;                    // Array to store all results before export
 
   // Constructor
   DataGrid(Disk disk, WindParams wind, int coordID, Array1d POS_1, Array1d POS_2);
 
-  void addOmegaIntegral(int funcID, ldouble nu);                                // Adds a column for integral over solid angle to compute moments of specific intensity
-  void addFrequencyIntegral(int funcID);                                        // Adds a column for integral moments of specific intensity over frequency to get moments of intensity
-  void addPowerIntegral(int funcID, ldouble p);                                 // Adds a column for integral nu^p * moments of specific intensity
-  void addBandIntegral(int funcID, ldouble a);                                  // Adds a column for integral moments of specific intensity over nu in [a, inf)
-  void addBandIntegral(int funcID, ldouble a, ldouble b);                       // Adds a column for integral moments of specific intensity over nu in [a, b]
-  void addMeanPhotonEnergy(int funcID);                                         // Adds a column for mean photon energy weighted by a moment of specific intensity
-  void addRadiationForce(int funcID);                                           // Adds a column for the force due to line absoption for a statistical distribution of lines
-  void addSpectra(int funcID, Array1d nu);                                      // Integrates over solid angle to compute moments of specific intensity
+  void addOmegaIntegral(int funcID, ldouble nu) {addOmegaIntegral("geometric integral", funcID, nu); }
+  void addFrequencyIntegral(int funcID) {addFrequencyIntegral("frequency integral", funcID); }
+  void addPowerIntegral(int funcID, ldouble p) {addPowerIntegral("power integral", funcID, p); }
+  void addBandIntegral(int funcID, ldouble a) {addBandIntegral("band integral", funcID, a); }
+  void addBandIntegral(int funcID, ldouble a, ldouble b) {addBandIntegral("band integral", funcID, a, b); }
+  void addMeanPhotonEnergy(int funcID) {addMeanPhotonEnergy("mean photon energy", funcID); }
+  void addRadiationForce(int funcID) {addRadiationForce("radiation force", funcID); }
+
+  void addOmegaIntegral(std::string name, int funcID, ldouble nu);              // Adds a column for integral over solid angle to compute moments of specific intensity
+  void addFrequencyIntegral(std::string name, int funcID);                      // Adds a column for integral moments of specific intensity over frequency to get moments of intensity
+  void addPowerIntegral(std::string name, int funcID, ldouble p);               // Adds a column for integral nu^p * moments of specific intensity
+  void addBandIntegral(std::string name, int funcID, ldouble a);                // Adds a column for integral moments of specific intensity over nu in [a, inf)
+  void addBandIntegral(std::string name, int funcID, ldouble a, ldouble b);     // Adds a column for integral moments of specific intensity over nu in [a, b]
+  void addMeanPhotonEnergy(std::string name, int funcID);                       // Adds a column for mean photon energy weighted by a moment of specific intensity
+  void addRadiationForce(std::string name, int funcID);                         // Adds a column for the force due to line absoption for a statistical distribution of lines
+
+  void addSpectraAndExport(std::string ExportPath, int funcID, Array1d nu);     // Integrates over solid angle to compute moments of specific intensity
 
   // Exports to csv file
   // This function will create a file but will NOT create a directory, so make
   // sure that all folders in path already exist.
   void Export(std::string ExportPath);
   void clear();
+  void clearparams();
 
 private:
 
   // Does the actual loop over all R and Theta values to add a column
-  Array1d Sample(int SampID, int funcID, ldouble nu, ldouble p, ldouble a, ldouble b);
+  Array1d Sample(int SampID, int funcID);
 
 };
 
